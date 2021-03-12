@@ -1,6 +1,6 @@
 [package]
 name = "psl-types"
-description = "A native library for Mozilla's Public Suffix List"
+description = "Common types for the public suffix implementation crates"
 version = "2.0.0-alpha.0"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/addr-rs/psl-types"
