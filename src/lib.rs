@@ -93,8 +93,9 @@ impl Suffix<'_> {
         self.typ
     }
 
+    // Could be const but Isahc needs support for Rust v1.41
     #[inline]
-    pub const fn is_known(&self) -> bool {
+    pub fn is_known(&self) -> bool {
         self.typ.is_some()
     }
 }
