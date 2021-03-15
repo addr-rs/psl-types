@@ -4,9 +4,9 @@
 #![forbid(unsafe_code)]
 
 /// A list of all public suffixes
-pub trait List<'a> {
+pub trait List {
     /// Finds the suffix information of the given input labels
-    fn find<T>(&self, labels: T) -> Info
+    fn find<'a, T>(&self, labels: T) -> Info
     where
         T: Iterator<Item = &'a [u8]>;
 
@@ -14,7 +14,7 @@ pub trait List<'a> {
     ///
     /// *NB:* `name` must be a valid domain name in lowercase
     #[inline]
-    fn suffix(&self, name: &'a [u8]) -> Option<Suffix<'a>> {
+    fn suffix<'a>(&self, name: &'a [u8]) -> Option<Suffix<'a>> {
         let mut labels = name.rsplit(|x| *x == b'.');
         let fqdn = if name.ends_with(b".") {
             labels.next();
@@ -38,7 +38,7 @@ pub trait List<'a> {
     ///
     /// *NB:* `name` must be a valid domain name in lowercase
     #[inline]
-    fn domain(&self, name: &'a [u8]) -> Option<Domain<'a>> {
+    fn domain<'a>(&self, name: &'a [u8]) -> Option<Domain<'a>> {
         let suffix = self.suffix(name)?;
         let name_len = name.len();
         let suffix_len = suffix.bytes.len();
@@ -52,6 +52,16 @@ pub trait List<'a> {
         let offset = name_len - registrable_len;
         let bytes = name.get(offset..)?;
         Some(Domain { bytes, suffix })
+    }
+}
+
+impl<L: List> List for &'_ L {
+    #[inline]
+    fn find<'a, T>(&self, labels: T) -> Info
+    where
+        T: Iterator<Item = &'a [u8]>,
+    {
+        (*self).find(labels)
     }
 }
 
