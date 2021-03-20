@@ -6,6 +6,8 @@
 /// A list of all public suffixes
 pub trait List {
     /// Finds the suffix information of the given input labels
+    ///
+    /// *NB:* `labels` must be in reverse order
     fn find<'a, T>(&self, labels: T) -> Info
     where
         T: Iterator<Item = &'a [u8]>;
