@@ -3,6 +3,8 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+use core::cmp::Ordering;
+
 /// A list of all public suffixes
 pub trait List {
     /// Finds the suffix information of the given input labels
@@ -82,7 +84,7 @@ pub struct Info {
 }
 
 /// The suffix of a domain name
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Copy, Clone, Eq, Ord, Hash, Debug)]
 pub struct Suffix<'a> {
     bytes: &'a [u8],
     fqdn: bool,
@@ -112,22 +114,39 @@ impl Suffix<'_> {
     }
 }
 
+impl PartialEq for Suffix<'_> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        let (this, other) = normalise_dot(self.bytes, self.fqdn, other.bytes);
+        this == other
+    }
+}
+
 impl PartialEq<&[u8]> for Suffix<'_> {
     #[inline]
     fn eq(&self, other: &&[u8]) -> bool {
-        self.bytes == *other
+        let (this, other) = normalise_dot(self.bytes, self.fqdn, *other);
+        this == other
     }
 }
 
 impl PartialEq<&str> for Suffix<'_> {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
-        self.bytes == other.as_bytes()
+        let (this, other) = normalise_dot(self.bytes, self.fqdn, other.as_bytes());
+        this == other
+    }
+}
+
+impl PartialOrd for Suffix<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let (this, other) = normalise_dot(self.bytes, self.fqdn, other.bytes);
+        Some(this.cmp(other))
     }
 }
 
 /// A registrable domain name
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Copy, Clone, Eq, Ord, Hash, Debug)]
 pub struct Domain<'a> {
     bytes: &'a [u8],
     suffix: Suffix<'a>,
@@ -145,18 +164,57 @@ impl Domain<'_> {
     }
 }
 
+impl PartialEq for Domain<'_> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, other.bytes);
+        this == other
+    }
+}
+
 impl PartialEq<&[u8]> for Domain<'_> {
     #[inline]
     fn eq(&self, other: &&[u8]) -> bool {
-        self.bytes == *other
+        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, *other);
+        this == other
     }
 }
 
 impl PartialEq<&str> for Domain<'_> {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
-        self.bytes == other.as_bytes()
+        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, other.as_bytes());
+        this == other
     }
+}
+
+impl PartialOrd for Domain<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, other.bytes);
+        Some(this.cmp(other))
+    }
+}
+
+#[inline]
+fn normalise_dot<'a>(
+    mut this: &'a [u8],
+    this_is_fqdn: bool,
+    mut other: &'a [u8],
+) -> (&'a [u8], &'a [u8]) {
+    match (this_is_fqdn, other.ends_with(b".")) {
+        (true, true) | (false, false) => {}
+        (false, true) => {
+            let other_len = other.len();
+            if other_len > 0 {
+                other = &other[..other_len - 1];
+            }
+        }
+        (true, false) => {
+            let this_len = this.len();
+            this = &this[..this_len - 1];
+        }
+    }
+    (this, other)
 }
 
 #[cfg(test)]
@@ -199,6 +257,28 @@ mod test {
         let domain = List.domain(b"example.com.").expect("domain name");
         assert_eq!(domain, "example.com.");
         assert_eq!(domain.suffix(), "com.");
+    }
+
+    #[test]
+    fn fqdn_comparisons() {
+        let domain = List.domain(b"example.com.").expect("domain name");
+        assert_eq!(domain, "example.com");
+        assert_eq!(domain.suffix(), "com");
+    }
+
+    #[test]
+    fn non_fqdn_comparisons() {
+        let domain = List.domain(b"example.com").expect("domain name");
+        assert_eq!(domain, "example.com.");
+        assert_eq!(domain.suffix(), "com.");
+    }
+
+    #[test]
+    fn self_comparisons() {
+        let fqdn = List.domain(b"example.com.").expect("domain name");
+        let non_fqdn = List.domain(b"example.com").expect("domain name");
+        assert_eq!(fqdn, non_fqdn);
+        assert_eq!(fqdn.suffix(), non_fqdn.suffix());
     }
 
     #[test]
