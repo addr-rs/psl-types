@@ -113,12 +113,14 @@ impl Suffix<'_> {
 }
 
 impl PartialEq<&[u8]> for Suffix<'_> {
+    #[inline]
     fn eq(&self, other: &&[u8]) -> bool {
         self.bytes == *other
     }
 }
 
 impl PartialEq<&str> for Suffix<'_> {
+    #[inline]
     fn eq(&self, other: &&str) -> bool {
         self.bytes == other.as_bytes()
     }
@@ -144,13 +146,85 @@ impl Domain<'_> {
 }
 
 impl PartialEq<&[u8]> for Domain<'_> {
+    #[inline]
     fn eq(&self, other: &&[u8]) -> bool {
         self.bytes == *other
     }
 }
 
 impl PartialEq<&str> for Domain<'_> {
+    #[inline]
     fn eq(&self, other: &&str) -> bool {
         self.bytes == other.as_bytes()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Info, List as Psl};
+
+    struct List;
+
+    impl Psl for List {
+        fn find<'a, T>(&self, mut labels: T) -> Info
+        where
+            T: Iterator<Item = &'a [u8]>,
+        {
+            match labels.next() {
+                Some(label) => Info {
+                    len: label.len(),
+                    typ: None,
+                },
+                None => Info { len: 0, typ: None },
+            }
+        }
+    }
+
+    #[test]
+    fn www_example_com() {
+        let domain = List.domain(b"www.example.com").expect("domain name");
+        assert_eq!(domain, "example.com");
+        assert_eq!(domain.suffix(), "com");
+    }
+
+    #[test]
+    fn example_com() {
+        let domain = List.domain(b"example.com").expect("domain name");
+        assert_eq!(domain, "example.com");
+        assert_eq!(domain.suffix(), "com");
+    }
+
+    #[test]
+    fn example_com_() {
+        let domain = List.domain(b"example.com.").expect("domain name");
+        assert_eq!(domain, "example.com.");
+        assert_eq!(domain.suffix(), "com.");
+    }
+
+    #[test]
+    fn com() {
+        let domain = List.domain(b"com");
+        assert_eq!(domain, None);
+
+        let suffix = List.suffix(b"com").expect("public suffix");
+        assert_eq!(suffix, "com");
+    }
+
+    #[test]
+    fn root() {
+        let domain = List.domain(b".");
+        assert_eq!(domain, None);
+
+        let suffix = List.suffix(b".").expect("public suffix");
+        assert_eq!(suffix, ".");
+    }
+
+    #[test]
+    fn empty_string() {
+        let domain = List.domain(b"");
+        assert_eq!(domain, None);
+
+        let suffix = List.suffix(b"");
+        assert_eq!(suffix, None);
     }
 }
