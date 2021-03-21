@@ -1,9 +1,18 @@
 //! Common types for the public suffix implementation crates
+//!
+//! The types in this crate assume that the input is valid
+//! UTF-8 encoded domain names. If input is potentially invalid,
+//! use a higher level crate like the `addr` crate.
+//!
+//! Some implentations may also assume that the domain name is
+//! in lowercase and/or may only support looking up unicode
+//! domain names.
 
 #![no_std]
 #![forbid(unsafe_code)]
 
 use core::cmp::Ordering;
+use core::hash::{Hash, Hasher};
 
 /// A list of all public suffixes
 pub trait List {
@@ -15,8 +24,6 @@ pub trait List {
         T: Iterator<Item = &'a [u8]>;
 
     /// Get the public suffix of the domain
-    ///
-    /// *NB:* `name` must be a valid domain name in lowercase
     #[inline]
     fn suffix<'a>(&self, name: &'a [u8]) -> Option<Suffix<'a>> {
         let mut labels = name.rsplit(|x| *x == b'.');
@@ -39,8 +46,6 @@ pub trait List {
     }
 
     /// Get the registrable domain
-    ///
-    /// *NB:* `name` must be a valid domain name in lowercase
     #[inline]
     fn domain<'a>(&self, name: &'a [u8]) -> Option<Domain<'a>> {
         let suffix = self.suffix(name)?;
@@ -84,7 +89,7 @@ pub struct Info {
 }
 
 /// The suffix of a domain name
-#[derive(Copy, Clone, Eq, Ord, Hash, Debug)]
+#[derive(Copy, Clone, Eq, Debug)]
 pub struct Suffix<'a> {
     bytes: &'a [u8],
     fqdn: bool,
@@ -92,21 +97,35 @@ pub struct Suffix<'a> {
 }
 
 impl Suffix<'_> {
+    /// The suffix as bytes
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
+    /// Whether or not the suffix is fully qualified (i.e. it ends with a `.`)
     #[inline]
     pub const fn is_fqdn(&self) -> bool {
         self.fqdn
     }
 
+    /// Whether this is an `ICANN`, `private` or unknown suffix
     #[inline]
     pub const fn typ(&self) -> Option<Type> {
         self.typ
     }
 
+    /// Returns the suffix with a trailing `.` removed
+    #[inline]
+    pub fn trim(mut self) -> Self {
+        if self.fqdn {
+            self.bytes = &self.bytes[..self.bytes.len() - 1];
+            self.fqdn = false;
+        }
+        self
+    }
+
+    /// Whether or not this is a known suffix (i.e. it is explicitly in the public suffix list)
     // Could be const but Isahc needs support for Rust v1.41
     #[inline]
     pub fn is_known(&self) -> bool {
@@ -117,104 +136,119 @@ impl Suffix<'_> {
 impl PartialEq for Suffix<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        let (this, other) = normalise_dot(self.bytes, self.fqdn, other.bytes);
-        this == other
+        self.trim().bytes == strip_dot(other.bytes)
     }
 }
 
 impl PartialEq<&[u8]> for Suffix<'_> {
     #[inline]
     fn eq(&self, other: &&[u8]) -> bool {
-        let (this, other) = normalise_dot(self.bytes, self.fqdn, *other);
-        this == other
+        self.trim().bytes == strip_dot(other)
     }
 }
 
 impl PartialEq<&str> for Suffix<'_> {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
-        let (this, other) = normalise_dot(self.bytes, self.fqdn, other.as_bytes());
-        this == other
+        self.trim().bytes == strip_dot(other.as_bytes())
+    }
+}
+
+impl Ord for Suffix<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.trim().bytes.cmp(strip_dot(other.bytes))
     }
 }
 
 impl PartialOrd for Suffix<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let (this, other) = normalise_dot(self.bytes, self.fqdn, other.bytes);
-        Some(this.cmp(other))
+        Some(self.trim().bytes.cmp(strip_dot(other.bytes)))
+    }
+}
+
+impl Hash for Suffix<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.trim().bytes.hash(state);
     }
 }
 
 /// A registrable domain name
-#[derive(Copy, Clone, Eq, Ord, Hash, Debug)]
+#[derive(Copy, Clone, Eq, Debug)]
 pub struct Domain<'a> {
     bytes: &'a [u8],
     suffix: Suffix<'a>,
 }
 
 impl Domain<'_> {
+    /// The domain name as bytes
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
+    /// The public suffix of this domain name
     #[inline]
     pub const fn suffix(&self) -> Suffix<'_> {
         self.suffix
+    }
+
+    /// Returns the domain with a trailing `.` removed
+    #[inline]
+    pub fn trim(mut self) -> Self {
+        if self.suffix.fqdn {
+            self.bytes = &self.bytes[..self.bytes.len() - 1];
+            self.suffix = self.suffix.trim();
+        }
+        self
     }
 }
 
 impl PartialEq for Domain<'_> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, other.bytes);
-        this == other
+        self.trim().bytes == strip_dot(other.bytes)
     }
 }
 
 impl PartialEq<&[u8]> for Domain<'_> {
     #[inline]
     fn eq(&self, other: &&[u8]) -> bool {
-        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, *other);
-        this == other
+        self.trim().bytes == strip_dot(other)
     }
 }
 
 impl PartialEq<&str> for Domain<'_> {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
-        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, other.as_bytes());
-        this == other
+        self.trim().bytes == strip_dot(other.as_bytes())
+    }
+}
+
+impl Ord for Domain<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.trim().bytes.cmp(strip_dot(other.bytes))
     }
 }
 
 impl PartialOrd for Domain<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let (this, other) = normalise_dot(self.bytes, self.suffix.fqdn, other.bytes);
-        Some(this.cmp(other))
+        Some(self.trim().bytes.cmp(strip_dot(other.bytes)))
+    }
+}
+
+impl Hash for Domain<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.trim().bytes.hash(state);
     }
 }
 
 #[inline]
-fn normalise_dot<'a>(
-    mut this: &'a [u8],
-    this_is_fqdn: bool,
-    mut other: &'a [u8],
-) -> (&'a [u8], &'a [u8]) {
-    match (this_is_fqdn, other.ends_with(b".")) {
-        (true, true) | (false, false) => {}
-        (false, true) => {
-            let other_len = other.len();
-            if other_len > 0 {
-                other = &other[..other_len - 1];
-            }
-        }
-        (true, false) => {
-            let this_len = this.len();
-            this = &this[..this_len - 1];
-        }
+fn strip_dot(bytes: &[u8]) -> &[u8] {
+    if bytes.ends_with(b".") {
+        &bytes[..bytes.len() - 1]
+    } else {
+        bytes
     }
-    (this, other)
 }
 
 #[cfg(test)]
@@ -279,6 +313,40 @@ mod test {
         let non_fqdn = List.domain(b"example.com").expect("domain name");
         assert_eq!(fqdn, non_fqdn);
         assert_eq!(fqdn.suffix(), non_fqdn.suffix());
+    }
+
+    #[test]
+    fn btreemap_comparisons() {
+        extern crate alloc;
+        use alloc::collections::BTreeSet;
+
+        let mut domain = BTreeSet::new();
+        let mut suffix = BTreeSet::new();
+
+        let fqdn = List.domain(b"example.com.").expect("domain name");
+        domain.insert(fqdn);
+        suffix.insert(fqdn.suffix());
+
+        let non_fqdn = List.domain(b"example.com").expect("domain name");
+        assert!(domain.contains(&non_fqdn));
+        assert!(suffix.contains(&non_fqdn.suffix()));
+    }
+
+    #[test]
+    fn hashmap_comparisons() {
+        extern crate std;
+        use std::collections::HashSet;
+
+        let mut domain = HashSet::new();
+        let mut suffix = HashSet::new();
+
+        let fqdn = List.domain(b"example.com.").expect("domain name");
+        domain.insert(fqdn);
+        suffix.insert(fqdn.suffix());
+
+        let non_fqdn = List.domain(b"example.com").expect("domain name");
+        assert!(domain.contains(&non_fqdn));
+        assert!(suffix.contains(&non_fqdn.suffix()));
     }
 
     #[test]
