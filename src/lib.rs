@@ -155,18 +155,21 @@ impl PartialEq<&str> for Suffix<'_> {
 }
 
 impl Ord for Suffix<'_> {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.trim().bytes.cmp(strip_dot(other.bytes))
     }
 }
 
 impl PartialOrd for Suffix<'_> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.trim().bytes.cmp(strip_dot(other.bytes)))
     }
 }
 
 impl Hash for Suffix<'_> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.trim().bytes.hash(state);
     }
@@ -225,18 +228,21 @@ impl PartialEq<&str> for Domain<'_> {
 }
 
 impl Ord for Domain<'_> {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.trim().bytes.cmp(strip_dot(other.bytes))
     }
 }
 
 impl PartialOrd for Domain<'_> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.trim().bytes.cmp(strip_dot(other.bytes)))
     }
 }
 
 impl Hash for Domain<'_> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.trim().bytes.hash(state);
     }
