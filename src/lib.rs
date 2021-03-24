@@ -97,6 +97,16 @@ pub struct Suffix<'a> {
 }
 
 impl Suffix<'_> {
+    /// Builds a new suffix
+    #[inline]
+    pub fn new(bytes: &[u8], typ: Option<Type>) -> Suffix<'_> {
+        Suffix {
+            bytes,
+            typ,
+            fqdn: bytes.ends_with(b"."),
+        }
+    }
+
     /// The suffix as bytes
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
@@ -183,6 +193,12 @@ pub struct Domain<'a> {
 }
 
 impl Domain<'_> {
+    /// Builds a root domain
+    #[inline]
+    pub const fn new<'a>(bytes: &'a [u8], suffix: Suffix<'a>) -> Domain<'a> {
+        Domain { bytes, suffix }
+    }
+
     /// The domain name as bytes
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
