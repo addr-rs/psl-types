@@ -99,6 +99,7 @@ pub struct Suffix<'a> {
 impl Suffix<'_> {
     /// Builds a new suffix
     #[inline]
+    #[doc(hidden)]
     pub fn new(bytes: &[u8], typ: Option<Type>) -> Suffix<'_> {
         Suffix {
             bytes,
@@ -195,6 +196,7 @@ pub struct Domain<'a> {
 impl Domain<'_> {
     /// Builds a root domain
     #[inline]
+    #[doc(hidden)]
     pub const fn new<'a>(bytes: &'a [u8], suffix: Suffix<'a>) -> Domain<'a> {
         Domain { bytes, suffix }
     }
