@@ -96,7 +96,7 @@ pub struct Suffix<'a> {
     typ: Option<Type>,
 }
 
-impl Suffix<'_> {
+impl<'a> Suffix<'a> {
     /// Builds a new suffix
     #[inline]
     #[doc(hidden)]
@@ -110,8 +110,8 @@ impl Suffix<'_> {
 
     /// The suffix as bytes
     #[inline]
-    pub const fn as_bytes(&self) -> &[u8] {
-        &self.bytes
+    pub const fn as_bytes(&self) -> &'a [u8] {
+        self.bytes
     }
 
     /// Whether or not the suffix is fully qualified (i.e. it ends with a `.`)
@@ -193,18 +193,18 @@ pub struct Domain<'a> {
     suffix: Suffix<'a>,
 }
 
-impl Domain<'_> {
+impl<'a> Domain<'a> {
     /// Builds a root domain
     #[inline]
     #[doc(hidden)]
-    pub const fn new<'a>(bytes: &'a [u8], suffix: Suffix<'a>) -> Domain<'a> {
+    pub const fn new(bytes: &'a [u8], suffix: Suffix<'a>) -> Domain<'a> {
         Domain { bytes, suffix }
     }
 
     /// The domain name as bytes
     #[inline]
-    pub const fn as_bytes(&self) -> &[u8] {
-        &self.bytes
+    pub const fn as_bytes(&self) -> &'a [u8] {
+        self.bytes
     }
 
     /// The public suffix of this domain name
@@ -398,5 +398,19 @@ mod test {
 
         let suffix = List.suffix(b"");
         assert_eq!(suffix, None);
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn accessors_borrow_correctly() {
+        fn return_suffix(domain: &str) -> &[u8] {
+            let suffix = List.suffix(domain.as_bytes()).unwrap();
+            suffix.as_bytes()
+        }
+
+        fn return_domain(name: &str) -> &[u8] {
+            let domain = List.domain(name.as_bytes()).unwrap();
+            domain.as_bytes()
+        }
     }
 }
