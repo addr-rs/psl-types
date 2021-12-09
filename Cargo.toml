@@ -1,7 +1,7 @@
 [package]
 name = "psl-types"
 description = "Common types for the public suffix implementation crates"
-version = "2.0.10-pre"
+version = "2.0.10"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/addr-rs/psl-types"
 documentation = "https://docs.rs/psl-types"
