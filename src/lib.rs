@@ -99,6 +99,7 @@ pub struct Suffix<'a> {
 impl<'a> Suffix<'a> {
     /// Builds a new suffix
     #[inline]
+    #[must_use]
     #[doc(hidden)]
     pub fn new(bytes: &[u8], typ: Option<Type>) -> Suffix<'_> {
         Suffix {
@@ -110,24 +111,28 @@ impl<'a> Suffix<'a> {
 
     /// The suffix as bytes
     #[inline]
+    #[must_use]
     pub const fn as_bytes(&self) -> &'a [u8] {
         self.bytes
     }
 
     /// Whether or not the suffix is fully qualified (i.e. it ends with a `.`)
     #[inline]
+    #[must_use]
     pub const fn is_fqdn(&self) -> bool {
         self.fqdn
     }
 
     /// Whether this is an `ICANN`, `private` or unknown suffix
     #[inline]
+    #[must_use]
     pub const fn typ(&self) -> Option<Type> {
         self.typ
     }
 
     /// Returns the suffix with a trailing `.` removed
     #[inline]
+    #[must_use]
     pub fn trim(mut self) -> Self {
         if self.fqdn {
             self.bytes = &self.bytes[..self.bytes.len() - 1];
@@ -139,6 +144,7 @@ impl<'a> Suffix<'a> {
     /// Whether or not this is a known suffix (i.e. it is explicitly in the public suffix list)
     // Could be const but Isahc needs support for Rust v1.41
     #[inline]
+    #[must_use]
     pub fn is_known(&self) -> bool {
         self.typ.is_some()
     }
@@ -196,6 +202,7 @@ pub struct Domain<'a> {
 impl<'a> Domain<'a> {
     /// Builds a root domain
     #[inline]
+    #[must_use]
     #[doc(hidden)]
     pub const fn new(bytes: &'a [u8], suffix: Suffix<'a>) -> Domain<'a> {
         Domain { bytes, suffix }
@@ -203,18 +210,21 @@ impl<'a> Domain<'a> {
 
     /// The domain name as bytes
     #[inline]
+    #[must_use]
     pub const fn as_bytes(&self) -> &'a [u8] {
         self.bytes
     }
 
     /// The public suffix of this domain name
     #[inline]
+    #[must_use]
     pub const fn suffix(&self) -> Suffix<'_> {
         self.suffix
     }
 
     /// Returns the domain with a trailing `.` removed
     #[inline]
+    #[must_use]
     pub fn trim(mut self) -> Self {
         if self.suffix.fqdn {
             self.bytes = &self.bytes[..self.bytes.len() - 1];
